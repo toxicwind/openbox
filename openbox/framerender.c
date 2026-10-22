@@ -51,19 +51,46 @@ static void framerender_max(ObFrame *self, RrAppearance *a);
    non-solid HORIZONTAL grad filled with the stoplight colour: RrPaint then
    renders the colour into pixel_data, transfers it to the button pixmap
    (surviving the frame composite), and draws the glyph mask over it. */
-static void stoplight_prepare(RrAppearance *a, guint32 color) {
-    if (!a) return;
-    gint r = (color>>16)&0xff, g = (color>>8)&0xff, b = color&0xff;
-    RrColor *c = RrColorNew(a->inst, r, g, b);
-    if (a->surface.primary) RrColorFree(a->surface.primary);
-    if (a->surface.secondary) RrColorFree(a->surface.secondary);
-    a->surface.primary = c;
-    a->surface.secondary = c;
-    a->surface.relief = RR_RELIEF_FLAT;
-    a->surface.border = 0;
-    a->surface.interlaced = 0;
-    if (a->surface.grad == RR_SURFACE_SOLID)
-        a->surface.grad = RR_SURFACE_HORIZONTAL;
+/* The title appearance's pixmap (RrPaint(t, self->title, ...) creates it; the
+   title sub-windows use it as their background and it is what openbox actually
+   surfaces -- verified: the title bar renders as (24,25,30). The button sub-
+   windows (self->max/iconify/close) are mapped but never composite their
+   pixmap to the screen. So draw the three stoplight discs DIRECTLY onto the
+   title pixmap at the button centers: this is the pixmap openbox shows. Called
+   from framerender_frame after RrPaint(t,...) so t->pixmap is fresh. */
+static void stoplight_draw_on_title(RrAppearance *t, ObFrame *self) {
+    if (!t || t->pixmap == None) return;
+    gint bs = ob_rr_theme->button_size;
+    gint r = bs/2 - 1;
+    gint cy = ob_rr_theme->paddingy + 1 + bs/2;
+    if (r < 1) return;
+    Display *dpy = RrDisplay(t->inst);
+    imlib_context_set_display(dpy);
+    imlib_context_set_visual(RrVisual(t->inst));
+    imlib_context_set_colormap(RrColormap(t->inst));
+
+    struct { gint on; gint x; guint32 color; } btns[3];
+    btns[0].on=self->max_on;     btns[0].x=self->max_x;     btns[0].color=STOP_GREEN;
+    btns[1].on=self->iconify_on; btns[1].x=self->iconify_x; btns[1].color=STOP_YELLOW;
+    btns[2].on=self->close_on;   btns[2].x=self->close_x;   btns[2].color=STOP_RED;
+
+    for (int i=0;i<3;i++) if (btns[i].on) {
+        Imlib_Image img = imlib_create_image(bs, bs);
+        if (!img) continue;
+        imlib_context_set_image(img);
+        imlib_image_clear();
+        imlib_context_set_color((btns[i].color>>16)&0xff, (btns[i].color>>8)&0xff,
+                                btns[i].color&0xff, 0xff);
+        imlib_image_fill_ellipse(bs/2, bs/2, r, r);
+
+        imlib_context_set_drawable(t->pixmap);
+        imlib_render_image_on_drawable(btns[i].x, cy - bs/2);
+
+        imlib_context_set_image(img);
+        imlib_free_image();
+        imlib_context_set_drawable(None);
+    }
+    XFlush(dpy);
 }
 static void framerender_desk(ObFrame *self, RrAppearance *a);
 static void framerender_iconify(ObFrame *self, RrAppearance *a);
@@ -351,6 +378,9 @@ void framerender_frame(ObFrame *self)
         framerender_desk(self, d);
         framerender_shade(self, s);
         framerender_close(self, c);
+        /* draw the colored stoplight discs onto the title pixmap (the pixmap
+           openbox actually surfaces), at the button centers */
+        stoplight_draw_on_title(t, self);
     }
 
     if (self->decorations & OB_FRAME_DECOR_HANDLE &&
@@ -420,14 +450,12 @@ static void framerender_icon(ObFrame *self, RrAppearance *a)
 static void framerender_max(ObFrame *self, RrAppearance *a)
 {
     if (!self->max_on) return;
-    stoplight_prepare(a, STOP_GREEN);
     RrPaint(a, self->max, ob_rr_theme->button_size, ob_rr_theme->button_size);
 }
 
 static void framerender_iconify(ObFrame *self, RrAppearance *a)
 {
     if (!self->iconify_on) return;
-    stoplight_prepare(a, STOP_YELLOW);
     RrPaint(a, self->iconify,
             ob_rr_theme->button_size, ob_rr_theme->button_size);
 }
@@ -448,7 +476,6 @@ static void framerender_shade(ObFrame *self, RrAppearance *a)
 static void framerender_close(ObFrame *self, RrAppearance *a)
 {
     if (!self->close_on) return;
-    stoplight_prepare(a, STOP_RED);
     RrPaint(a, self->close,
             ob_rr_theme->button_size, ob_rr_theme->button_size);
 }

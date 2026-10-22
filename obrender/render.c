@@ -27,6 +27,7 @@
 #include "theme.h"
 
 #include <glib.h>
+#include <stdio.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xft/Xft.h>
@@ -153,6 +154,20 @@ Pixmap RrPaintPixmap(RrAppearance *a, gint w, gint h)
         case RR_TEXTURE_RGBA:
             g_assert(!transferred);
             {
+                static int _d=0;
+                if (!_d) {
+                    FILE *f=fopen("/tmp/rgba-debug.log","w");
+                    if (f) {
+                        RrTextureRGBA *rn=&a->texture[i].data.rgba;
+                        guint32 first = rn->data ? rn->data[0] : 0xdead;
+                        gint mid = rn->width>0 && rn->height>0 ? rn->data[(rn->height/2)*rn->width + rn->width/2] : 0;
+                        fprintf(f, "RGBA-case a=%p w=%d h=%d tex=%d type=%d bw=%d bh=%d first=%08x mid=%08x\n",
+                                (void*)a, a->w, a->h, a->textures, a->texture[i].type,
+                                rn->width, rn->height, first, mid);
+                        fclose(f);
+                    }
+                    _d=1;
+                }
                 RrRect narea = tarea;
                 RrTextureRGBA *rgb = &a->texture[i].data.rgba;
                 narea.x += rgb->tx;
