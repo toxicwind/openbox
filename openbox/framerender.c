@@ -44,37 +44,26 @@ static void framerender_max(ObFrame *self, RrAppearance *a);
    to the screen (the twitter-verified root cause: writing to the title's CPU
    pixel_data never reaches an X pixmap because SOLID title surfaces skip
    pixel_data_to_pixmap). */
-static void stoplight_paint_disc(RrAppearance *a, guint32 color) {
-    static int dbg = 0;
-    if (!a || a->pixmap == None) {
-        if (!dbg) { FILE *f = fopen("/tmp/stoplight-debug.log", "w"); if (f) { fprintf(f, "paint SKIPPED a=%p pixmap=%lu\n", (void*)a, (unsigned long)(a?a->pixmap:None)); fclose(f); } dbg = 1; }
-        return;
-    }
-    gint cx = a->w / 2, cy = a->h / 2;
-    gint r = a->w / 2 - 1;
-    if (r < 1) return;
-    Display *dpy = RrDisplay(a->inst);
-
-    if (!dbg) { FILE *f = fopen("/tmp/stoplight-debug.log", "w"); if (f) { fprintf(f, "paint a=%p w=%d h=%d pixmap=%lu color=%08x cx=%d cy=%d r=%d\n", (void*)a, a->w, a->h, (unsigned long)a->pixmap, color, cx, cy, r); fclose(f); } dbg = 1; }
-
-    imlib_context_set_display(dpy);
-    imlib_context_set_visual(RrVisual(a->inst));
-    imlib_context_set_colormap(RrColormap(a->inst));
-
-    Imlib_Image img = imlib_create_image(a->w, a->h);
-    if (!img) return;
-    imlib_context_set_image(img);
-    imlib_image_clear();
-    imlib_context_set_color((color>>16)&0xff, (color>>8)&0xff, color&0xff, (color>>24)&0xff);
-    imlib_image_fill_ellipse(cx, cy, r, r);
-
-    imlib_context_set_drawable(a->pixmap);
-    imlib_context_set_image(img);
-    imlib_context_set_blend(1);
-    imlib_render_image_on_drawable(cx - r, cy - r);
-
-    imlib_free_image();
-    imlib_context_set_drawable(None);
+/* Bake a macOS stoplight background into a title button's appearance.
+   Called BEFORE RrPaint. RrRender only fills a->surface.pixel_data for its
+   grad, and pixel_data_to_pixmap only transfers pixel_data->pixmap when the
+   surface is NOT solid (render.c line 99). So we force the surface to a
+   non-solid HORIZONTAL grad filled with the stoplight colour: RrPaint then
+   renders the colour into pixel_data, transfers it to the button pixmap
+   (surviving the frame composite), and draws the glyph mask over it. */
+static void stoplight_prepare(RrAppearance *a, guint32 color) {
+    if (!a) return;
+    gint r = (color>>16)&0xff, g = (color>>8)&0xff, b = color&0xff;
+    RrColor *c = RrColorNew(a->inst, r, g, b);
+    if (a->surface.primary) RrColorFree(a->surface.primary);
+    if (a->surface.secondary) RrColorFree(a->surface.secondary);
+    a->surface.primary = c;
+    a->surface.secondary = c;
+    a->surface.relief = RR_RELIEF_FLAT;
+    a->surface.border = 0;
+    a->surface.interlaced = 0;
+    if (a->surface.grad == RR_SURFACE_SOLID)
+        a->surface.grad = RR_SURFACE_HORIZONTAL;
 }
 static void framerender_desk(ObFrame *self, RrAppearance *a);
 static void framerender_iconify(ObFrame *self, RrAppearance *a);
@@ -431,16 +420,16 @@ static void framerender_icon(ObFrame *self, RrAppearance *a)
 static void framerender_max(ObFrame *self, RrAppearance *a)
 {
     if (!self->max_on) return;
+    stoplight_prepare(a, STOP_GREEN);
     RrPaint(a, self->max, ob_rr_theme->button_size, ob_rr_theme->button_size);
-    stoplight_paint_disc(a, STOP_GREEN);
 }
 
 static void framerender_iconify(ObFrame *self, RrAppearance *a)
 {
     if (!self->iconify_on) return;
+    stoplight_prepare(a, STOP_YELLOW);
     RrPaint(a, self->iconify,
             ob_rr_theme->button_size, ob_rr_theme->button_size);
-    stoplight_paint_disc(a, STOP_YELLOW);
 }
 
 static void framerender_desk(ObFrame *self, RrAppearance *a)
@@ -459,7 +448,7 @@ static void framerender_shade(ObFrame *self, RrAppearance *a)
 static void framerender_close(ObFrame *self, RrAppearance *a)
 {
     if (!self->close_on) return;
+    stoplight_prepare(a, STOP_RED);
     RrPaint(a, self->close,
             ob_rr_theme->button_size, ob_rr_theme->button_size);
-    stoplight_paint_disc(a, STOP_RED);
 }
