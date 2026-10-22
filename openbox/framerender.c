@@ -471,19 +471,38 @@ static void framerender_icon(ObFrame *self, RrAppearance *a)
             ob_rr_theme->button_size + 2, ob_rr_theme->button_size + 2);
 }
 
+/* Bake a solid stoplight disc into the button appearance's surface so RrPaint
+   transfers it via pixel_data_to_pixmap (the KNOWN-working conversion - openbox's
+   own glyph composited fine). The RGBA-texture path produced BLACK on :99; the
+   surface path converts correctly. Set the button surface to a non-solid grad
+   filled with the stoplight colour: RrRender fills pixel_data, non-solid forces
+   pixel_data_to_pixmap, then the glyph mask draws over. Called BEFORE RrPaint. */
+static void stoplight_bake_surface(RrAppearance *a, guint32 color) {
+    if (!a) return;
+    RrColor *c = RrColorNew(a->inst, (color>>16)&0xff, (color>>8)&0xff, color&0xff);
+    if (a->surface.primary) RrColorFree(a->surface.primary);
+    if (a->surface.secondary) RrColorFree(a->surface.secondary);
+    a->surface.primary = c;
+    a->surface.secondary = c;
+    a->surface.relief = RR_RELIEF_FLAT;
+    a->surface.border = 0;
+    a->surface.interlaced = 0;
+    a->surface.grad = RR_SURFACE_HORIZONTAL;
+}
+
 static void framerender_max(ObFrame *self, RrAppearance *a)
 {
     if (!self->max_on) return;
+    stoplight_bake_surface(a, STOP_GREEN);
     RrPaint(a, self->max, ob_rr_theme->button_size, ob_rr_theme->button_size);
-    stoplight_paint_btn(self->max, ob_rr_theme->button_size, STOP_GREEN);
 }
 
 static void framerender_iconify(ObFrame *self, RrAppearance *a)
 {
     if (!self->iconify_on) return;
+    stoplight_bake_surface(a, STOP_YELLOW);
     RrPaint(a, self->iconify,
             ob_rr_theme->button_size, ob_rr_theme->button_size);
-    stoplight_paint_btn(self->iconify, ob_rr_theme->button_size, STOP_YELLOW);
 }
 
 static void framerender_desk(ObFrame *self, RrAppearance *a)
@@ -502,7 +521,7 @@ static void framerender_shade(ObFrame *self, RrAppearance *a)
 static void framerender_close(ObFrame *self, RrAppearance *a)
 {
     if (!self->close_on) return;
+    stoplight_bake_surface(a, STOP_RED);
     RrPaint(a, self->close,
             ob_rr_theme->button_size, ob_rr_theme->button_size);
-    stoplight_paint_btn(self->close, ob_rr_theme->button_size, STOP_RED);
 }
