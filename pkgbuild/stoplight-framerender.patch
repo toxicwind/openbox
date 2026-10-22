@@ -1,0 +1,57 @@
+diff --git a/openbox/framerender.c b/openbox/framerender.c
+index 094d596..dfb7a7a 100644
+--- a/openbox/framerender.c
++++ b/openbox/framerender.c
+@@ -23,10 +23,30 @@
+ #include "client.h"
+ #include "framerender.h"
+ #include "obrender/theme.h"
++#include <Imlib2.h>
+ 
+ static void framerender_label(ObFrame *self, RrAppearance *a);
+ static void framerender_icon(ObFrame *self, RrAppearance *a);
+ static void framerender_max(ObFrame *self, RrAppearance *a);
++
++/* macOS-style stoplight color circles for the title buttons.
++   Draw a filled circle centered in the button appearance (green=max,
++   yellow=iconify, red=close) via imlib2 so the window controls look like a
++   Mac stoplight instead of openbox's single-color theme glyphs.
++   Color is 0xAARRGGBB. */
++static void stoplight_button(RrAppearance *a, guint32 color) {
++    imlib_context_set_drawable(a->pixmap);
++    imlib_context_set_color((color >> 16) & 0xff,
++                            (color >> 8) & 0xff,
++                            (color >> 0) & 0xff,
++                            (color >> 24) & 0xff);
++    imlib_image_fill_ellipse(a->w / 2, a->h / 2,
++                             (a->w / 2) - 1, (a->h / 2) - 1);
++}
++
++#define STOP_RED    0xffff6052
++#define STOP_YELLOW 0xffffbd45
++#define STOP_GREEN  0xff29c86d
+ static void framerender_iconify(ObFrame *self, RrAppearance *a);
+ static void framerender_desk(ObFrame *self, RrAppearance *a);
+ static void framerender_shade(ObFrame *self, RrAppearance *a);
+@@ -382,6 +402,7 @@ static void framerender_max(ObFrame *self, RrAppearance *a)
+ {
+     if (!self->max_on) return;
+     RrPaint(a, self->max, ob_rr_theme->button_size, ob_rr_theme->button_size);
++    stoplight_button(a, STOP_GREEN);
+ }
+ 
+ static void framerender_iconify(ObFrame *self, RrAppearance *a)
+@@ -389,6 +410,7 @@ static void framerender_iconify(ObFrame *self, RrAppearance *a)
+     if (!self->iconify_on) return;
+     RrPaint(a, self->iconify,
+             ob_rr_theme->button_size, ob_rr_theme->button_size);
++    stoplight_button(a, STOP_YELLOW);
+ }
+ 
+ static void framerender_desk(ObFrame *self, RrAppearance *a)
+@@ -409,4 +431,5 @@ static void framerender_close(ObFrame *self, RrAppearance *a)
+     if (!self->close_on) return;
+     RrPaint(a, self->close,
+             ob_rr_theme->button_size, ob_rr_theme->button_size);
++    stoplight_button(a, STOP_RED);
+ }
