@@ -51,13 +51,34 @@ static void framerender_max(ObFrame *self, RrAppearance *a);
    non-solid HORIZONTAL grad filled with the stoplight colour: RrPaint then
    renders the colour into pixel_data, transfers it to the button pixmap
    (surviving the frame composite), and draws the glyph mask over it. */
-/* The title appearance's pixmap (RrPaint(t, self->title, ...) creates it; the
-   title sub-windows use it as their background and it is what openbox actually
-   surfaces -- verified: the title bar renders as (24,25,30). The button sub-
-   windows (self->max/iconify/close) are mapped but never composite their
-   pixmap to the screen. So draw the three stoplight discs DIRECTLY onto the
-   title pixmap at the button centers: this is the pixmap openbox shows. Called
-   from framerender_frame after RrPaint(t,...) so t->pixmap is fresh. */
+/* Draw a solid stoplight disc into a button X-WINDOW (self->max/iconify/close)
+   directly via imlib2. The button windows ARE visibly composited (verified: the
+   button shows the theme's glyph, e.g. 71,173,214 blue). Painting the disc into
+   the window after it is mapped replaces the glyph with a colored circle. Called
+   from framerender_frame for the title buttons. */
+static void stoplight_paint_btn(Window win, gint bs, guint32 color) {
+    if (win == None || bs <= 0) return;
+    Display *dpy = RrDisplay(ob_rr_theme->inst);
+    imlib_context_set_display(dpy);
+    imlib_context_set_visual(RrVisual(ob_rr_theme->inst));
+    imlib_context_set_colormap(RrColormap(ob_rr_theme->inst));
+    imlib_context_set_dither(0);
+    imlib_context_set_blend(0);
+    gint r = bs/2 - 1;
+    Imlib_Image img = imlib_create_image(bs, bs);
+    if (!img) return;
+    imlib_context_set_image(img);
+    imlib_image_clear();
+    imlib_context_set_color((color>>16)&0xff, (color>>8)&0xff, color&0xff, 0xff);
+    imlib_image_fill_ellipse(bs/2, bs/2, r, r);
+    /* blit onto the window */
+    imlib_context_set_drawable(win);
+    imlib_render_image_on_drawable(0, 0);
+    imlib_context_set_image(img);
+    imlib_free_image();
+    imlib_context_set_drawable(None);
+    XFlush(dpy);
+}
 static void stoplight_draw_on_title(RrAppearance *t, ObFrame *self) {
     if (!t || t->pixmap == None) return;
     gint bs = ob_rr_theme->button_size;
@@ -454,6 +475,7 @@ static void framerender_max(ObFrame *self, RrAppearance *a)
 {
     if (!self->max_on) return;
     RrPaint(a, self->max, ob_rr_theme->button_size, ob_rr_theme->button_size);
+    stoplight_paint_btn(self->max, ob_rr_theme->button_size, STOP_GREEN);
 }
 
 static void framerender_iconify(ObFrame *self, RrAppearance *a)
@@ -461,6 +483,7 @@ static void framerender_iconify(ObFrame *self, RrAppearance *a)
     if (!self->iconify_on) return;
     RrPaint(a, self->iconify,
             ob_rr_theme->button_size, ob_rr_theme->button_size);
+    stoplight_paint_btn(self->iconify, ob_rr_theme->button_size, STOP_YELLOW);
 }
 
 static void framerender_desk(ObFrame *self, RrAppearance *a)
@@ -481,4 +504,5 @@ static void framerender_close(ObFrame *self, RrAppearance *a)
     if (!self->close_on) return;
     RrPaint(a, self->close,
             ob_rr_theme->button_size, ob_rr_theme->button_size);
+    stoplight_paint_btn(self->close, ob_rr_theme->button_size, STOP_RED);
 }
