@@ -60,14 +60,6 @@ static void framerender_max(ObFrame *self, RrAppearance *a);
    from framerender_frame after RrPaint(t,...) so t->pixmap is fresh. */
 static void stoplight_draw_on_title(RrAppearance *t, ObFrame *self) {
     if (!t || t->pixmap == None) return;
-    static int _dd=0;
-    if (!_dd) {
-        FILE *f=fopen("/tmp/tpix-debug.log","w");
-        if (f){ fprintf(f,"draw_on_title t=%p pixmap=%lu w=%d h=%d max_x=%d bs=%d pd=%d\n",
-                        (void*)t,(unsigned long)t->pixmap,t->w,t->h,
-                        self->max_x,ob_rr_theme->button_size,ob_rr_theme->paddingy); fclose(f); }
-        _dd=1;
-    }
     gint bs = ob_rr_theme->button_size;
     gint r = bs/2 - 1;
     gint cy = ob_rr_theme->paddingy + 1 + bs/2;
@@ -98,7 +90,10 @@ static void stoplight_draw_on_title(RrAppearance *t, ObFrame *self) {
         imlib_free_image();
         imlib_context_set_drawable(None);
     }
-    XFlush(dpy);
+    /* force the title window (and its sub-windows) to re-display from the now
+       updated t->pixmap, otherwise they keep showing the previous background */
+    XClearWindow(RrDisplay(t->inst), self->title);
+    XFlush(RrDisplay(t->inst));
 }
 static void framerender_desk(ObFrame *self, RrAppearance *a);
 static void framerender_iconify(ObFrame *self, RrAppearance *a);
