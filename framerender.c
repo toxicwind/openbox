@@ -23,104 +23,14 @@
 #include "client.h"
 #include "framerender.h"
 #include "obrender/theme.h"
-#include <Imlib2.h>
 
 static void framerender_label(ObFrame *self, RrAppearance *a);
 static void framerender_icon(ObFrame *self, RrAppearance *a);
 static void framerender_max(ObFrame *self, RrAppearance *a);
-
-/* macOS-style stoplight color circles for the title buttons.
-   Draw a filled circle centered in the button appearance (green=max,
-   yellow=iconify, red=close) via imlib2 so the window controls look like a
-   Mac stoplight instead of openbox's single-color theme glyphs.
-   Color is 0xAARRGGBB. */
-#define STOP_RED    0xffff6052
-#define STOP_YELLOW 0xffffbd45
-#define STOP_GREEN  0xff29c86d
-
-/* Draw a filled macOS stoplight disc directly onto the button's X pixmap via
-   imlib2. RrPaint renders the theme glyph into a->pixmap; drawing a colored
-   disc over it on that SAME pixmap is what openbox composites to the frame and
-   to the screen (the twitter-verified root cause: writing to the title's CPU
-   pixel_data never reaches an X pixmap because SOLID title surfaces skip
-   pixel_data_to_pixmap). */
-/* Bake a macOS stoplight background into a title button's appearance.
-   Called BEFORE RrPaint. RrRender only fills a->surface.pixel_data for its
-   grad, and pixel_data_to_pixmap only transfers pixel_data->pixmap when the
-   surface is NOT solid (render.c line 99). So we force the surface to a
-   non-solid HORIZONTAL grad filled with the stoplight colour: RrPaint then
-   renders the colour into pixel_data, transfers it to the button pixmap
-   (surviving the frame composite), and draws the glyph mask over it. */
-/* Draw a solid stoplight disc into a button X-WINDOW (self->max/iconify/close)
-   directly via imlib2. The button windows ARE visibly composited (verified: the
-   button shows the theme's glyph, e.g. 71,173,214 blue). Painting the disc into
-   the window after it is mapped replaces the glyph with a colored circle. Called
-   from framerender_frame for the title buttons. */
-static void stoplight_paint_btn(Window win, gint bs, guint32 color) {
-    if (win == None || bs <= 0) return;
-    Display *dpy = RrDisplay(ob_rr_theme->inst);
-    imlib_context_set_display(dpy);
-    imlib_context_set_visual(RrVisual(ob_rr_theme->inst));
-    imlib_context_set_colormap(RrColormap(ob_rr_theme->inst));
-    imlib_context_set_dither(0);
-    imlib_context_set_blend(0);
-    gint r = bs/2 - 1;
-    Imlib_Image img = imlib_create_image(bs, bs);
-    if (!img) return;
-    imlib_context_set_image(img);
-    imlib_image_clear();
-    imlib_context_set_color((color>>16)&0xff, (color>>8)&0xff, color&0xff, 0xff);
-    imlib_image_fill_ellipse(bs/2, bs/2, r, r);
-    /* blit onto the window */
-    imlib_context_set_drawable(win);
-    imlib_render_image_on_drawable(0, 0);
-    imlib_context_set_image(img);
-    imlib_free_image();
-    imlib_context_set_drawable(None);
-    XFlush(dpy);
-}
-static void stoplight_draw_on_title(RrAppearance *t, ObFrame *self) {
-    if (!t || t->pixmap == None) return;
-    gint bs = ob_rr_theme->button_size;
-    gint r = bs/2 - 1;
-    gint cy = ob_rr_theme->paddingy + 1 + bs/2;
-    if (r < 1) return;
-    Display *dpy = RrDisplay(t->inst);
-    imlib_context_set_display(dpy);
-    imlib_context_set_visual(RrVisual(t->inst));
-    imlib_context_set_colormap(RrColormap(t->inst));
-
-    struct { gint on; gint x; guint32 color; } btns[3];
-    btns[0].on=self->max_on;     btns[0].x=self->max_x;     btns[0].color=STOP_GREEN;
-    btns[1].on=self->iconify_on; btns[1].x=self->iconify_x; btns[1].color=STOP_YELLOW;
-    btns[2].on=self->close_on;   btns[2].x=self->close_x;   btns[2].color=STOP_RED;
-
-    for (int i=0;i<3;i++) if (btns[i].on) {
-        Imlib_Image img = imlib_create_image(bs, bs);
-        if (!img) continue;
-        imlib_context_set_image(img);
-        imlib_image_clear();
-        imlib_context_set_color((btns[i].color>>16)&0xff, (btns[i].color>>8)&0xff,
-                                btns[i].color&0xff, 0xff);
-        imlib_image_fill_ellipse(bs/2, bs/2, r, r);
-
-        imlib_context_set_drawable(t->pixmap);
-        imlib_render_image_on_drawable(btns[i].x, cy - bs/2);
-
-        imlib_context_set_image(img);
-        imlib_free_image();
-        imlib_context_set_drawable(None);
-    }
-    /* force the title window (and its sub-windows) to re-display from the now
-       updated t->pixmap, otherwise they keep showing the previous background */
-    XClearWindow(RrDisplay(t->inst), self->title);
-    XFlush(RrDisplay(t->inst));
-}
-static void framerender_desk(ObFrame *self, RrAppearance *a);
 static void framerender_iconify(ObFrame *self, RrAppearance *a);
+static void framerender_desk(ObFrame *self, RrAppearance *a);
 static void framerender_shade(ObFrame *self, RrAppearance *a);
 static void framerender_close(ObFrame *self, RrAppearance *a);
-
 
 void framerender_frame(ObFrame *self)
 {
@@ -402,9 +312,6 @@ void framerender_frame(ObFrame *self)
         framerender_desk(self, d);
         framerender_shade(self, s);
         framerender_close(self, c);
-        /* draw the colored stoplight discs onto the title pixmap (the pixmap
-           openbox actually surfaces), at the button centers */
-        stoplight_draw_on_title(t, self);
     }
 
     if (self->decorations & OB_FRAME_DECOR_HANDLE &&
@@ -471,36 +378,15 @@ static void framerender_icon(ObFrame *self, RrAppearance *a)
             ob_rr_theme->button_size + 2, ob_rr_theme->button_size + 2);
 }
 
-/* Bake a solid stoplight disc into the button appearance's surface so RrPaint
-   transfers it via pixel_data_to_pixmap (the KNOWN-working conversion - openbox's
-   own glyph composited fine). The RGBA-texture path produced BLACK on :99; the
-   surface path converts correctly. Set the button surface to a non-solid grad
-   filled with the stoplight colour: RrRender fills pixel_data, non-solid forces
-   pixel_data_to_pixmap, then the glyph mask draws over. Called BEFORE RrPaint. */
-static void stoplight_bake_surface(RrAppearance *a, guint32 color) {
-    if (!a) return;
-    RrColor *c = RrColorNew(a->inst, (color>>16)&0xff, (color>>8)&0xff, color&0xff);
-    if (a->surface.primary) RrColorFree(a->surface.primary);
-    if (a->surface.secondary) RrColorFree(a->surface.secondary);
-    a->surface.primary = c;
-    a->surface.secondary = c;
-    a->surface.relief = RR_RELIEF_FLAT;
-    a->surface.border = 0;
-    a->surface.interlaced = 0;
-    a->surface.grad = RR_SURFACE_HORIZONTAL;
-}
-
 static void framerender_max(ObFrame *self, RrAppearance *a)
 {
     if (!self->max_on) return;
-    stoplight_bake_surface(a, STOP_GREEN);
     RrPaint(a, self->max, ob_rr_theme->button_size, ob_rr_theme->button_size);
 }
 
 static void framerender_iconify(ObFrame *self, RrAppearance *a)
 {
     if (!self->iconify_on) return;
-    stoplight_bake_surface(a, STOP_YELLOW);
     RrPaint(a, self->iconify,
             ob_rr_theme->button_size, ob_rr_theme->button_size);
 }
@@ -521,7 +407,6 @@ static void framerender_shade(ObFrame *self, RrAppearance *a)
 static void framerender_close(ObFrame *self, RrAppearance *a)
 {
     if (!self->close_on) return;
-    stoplight_bake_surface(a, STOP_RED);
     RrPaint(a, self->close,
             ob_rr_theme->button_size, ob_rr_theme->button_size);
 }

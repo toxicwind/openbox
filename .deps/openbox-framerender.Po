@@ -237,7 +237,7 @@ openbox/openbox-framerender.o: openbox/framerender.c \
  /usr/include/X11/extensions/sync.h \
  /usr/include/X11/extensions/syncconst.h openbox/screen.h \
  openbox/client.h openbox/mwm.h openbox/stacking.h openbox/window.h \
- obrender/color.h openbox/framerender.h /usr/include/Imlib2.h
+ obrender/color.h openbox/framerender.h
 /usr/include/stdc-predef.h:
 openbox/frame.h:
 openbox/geom.h:
@@ -577,4 +577,3 @@ openbox/stacking.h:
 openbox/window.h:
 obrender/color.h:
 openbox/framerender.h:
-/usr/include/Imlib2.h:
