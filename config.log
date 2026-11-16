@@ -29,7 +29,7 @@ uname -v = #1 SMP PREEMPT_DYNAMIC Wed, 16 Sep 2026 18:34:30 +0000
 
 PATH: /home/toxic/.bun/bin/
 PATH: /home/toxic/.local/bin/
-PATH: /home/toxic/estate/bin/
+PATH: /home/toxic/pens/estate/bin/
 PATH: /home/toxic/go/bin/
 PATH: /home/toxic/.cargo/bin/
 PATH: /home/toxic/.pdtm/go/bin/
@@ -962,7 +962,7 @@ pkg_cv_XML_LIBS=-lxml2
 ## Output variables. ##
 ## ----------------- ##
 
-ACLOCAL='${SHELL} '\''/home/toxic/estate/ranch/openbox/missing'\'' aclocal-1.18'
+ACLOCAL='${SHELL} '\''/home/toxic/pens/estate/ranch/openbox/missing'\'' aclocal-1.18'
 AMDEPBACKSLASH='\'
 AMDEP_FALSE='#'
 AMDEP_TRUE=''
@@ -972,9 +972,9 @@ AM_DEFAULT_V='$(AM_DEFAULT_VERBOSITY)'
 AM_DEFAULT_VERBOSITY='0'
 AM_V='$(V)'
 AR='ar'
-AUTOCONF='${SHELL} '\''/home/toxic/estate/ranch/openbox/missing'\'' autoconf'
-AUTOHEADER='${SHELL} '\''/home/toxic/estate/ranch/openbox/missing'\'' autoheader'
-AUTOMAKE='${SHELL} '\''/home/toxic/estate/ranch/openbox/missing'\'' automake-1.18'
+AUTOCONF='${SHELL} '\''/home/toxic/pens/estate/ranch/openbox/missing'\'' autoconf'
+AUTOHEADER='${SHELL} '\''/home/toxic/pens/estate/ranch/openbox/missing'\'' autoheader'
+AUTOMAKE='${SHELL} '\''/home/toxic/pens/estate/ranch/openbox/missing'\'' automake-1.18'
 AWK='gawk'
 CC='gcc'
 CCDEPMODE='depmode=gcc3'
@@ -1030,7 +1030,7 @@ LTLIBICONV='-liconv'
 LTLIBINTL=''
 LTLIBOBJS=''
 LT_SYS_LIBRARY_PATH=''
-MAKEINFO='${SHELL} '\''/home/toxic/estate/ranch/openbox/missing'\'' makeinfo'
+MAKEINFO='${SHELL} '\''/home/toxic/pens/estate/ranch/openbox/missing'\'' makeinfo'
 MANIFEST_TOOL=':'
 MKDIR_P='/usr/bin/mkdir -p'
 MSGFMT='/usr/bin/msgfmt'
@@ -1151,7 +1151,7 @@ host_vendor='pc'
 htmldir='${docdir}'
 includedir='${prefix}/include'
 infodir='${datarootdir}/info'
-install_sh='${SHELL} /home/toxic/estate/ranch/openbox/install-sh'
+install_sh='${SHELL} /home/toxic/pens/estate/ranch/openbox/install-sh'
 libdir='${exec_prefix}/lib'
 libexecdir='${exec_prefix}/libexec'
 localedir='${datarootdir}/locale'
